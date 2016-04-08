@@ -25,6 +25,7 @@ module Aws::SessionStore::DynamoDB::Locking
     # Updates session in database
     def set_session_data(env, sid, session, options = {})
       return false if session.empty?
+      return sid if options.empty? && data_unchanged?(env,pack_data(session))
       handle_error(env) do
         save_opts = update_opts(env, sid, session, options)
         result = @config.dynamo_db_client.update_item(save_opts)
