@@ -23,7 +23,7 @@ module Aws::SessionStore::DynamoDB
     # @option (see Configuration#initialize)
     def create_table(options = {})
       config = load_config(options)
-      ddb_options = properties(config.table_name, config.table_key, config.shadow).merge(
+      ddb_options = properties(config.table_name, config.table_key, config.index).merge(
           throughput(config.read_capacity, config.write_capacity)
         )
       ddb_options.merge!(index(config.index)) if config.index
@@ -56,15 +56,12 @@ module Aws::SessionStore::DynamoDB
 
     # @return [Hash] Attribute settings for creating a session table.
     # @api private
-    def attributes(hash_key, shadow)
+    def attributes(hash_key, index)
       attributes = [{:attribute_name => hash_key, :attribute_type => 'S'}]
 
-      if shadow
-        shadow.split(',').each do |e|
-          nvp = e.split(':')
-          name = nvp[0].strip
-          type = nvp.length > 1 ? nvp[1].strip : 'S'
-          attributes << {:attribute_name => name, :attribute_type => type}
+      if index
+        index.split(',').map { |s| s.strip }.each do |name|
+          attributes << {:attribute_name => name, :attribute_type => 'S'}
         end
       end
 
@@ -100,8 +97,8 @@ module Aws::SessionStore::DynamoDB
 
     # @return Properties for Session table
     # @api private
-    def properties(table_name, hash_key, shadow)
-      attributes(hash_key, shadow).merge(schema(table_name, hash_key))
+    def properties(table_name, hash_key, index)
+      attributes(hash_key, index).merge(schema(table_name, hash_key))
     end
 
     # @api private

@@ -142,8 +142,7 @@ module Aws::SessionStore::DynamoDB::Locking
 
       attr = Hash.new
 
-      @config.shadow.split(',').each do |e|
-        key = e.split(':')[0]
+      @config.shadow.split(',').map { |s| s.strip }.each do |key|
         value = session[key]
         attr[key] = value.nil? ? {:action => "DELETE"} : {:value => value, :action => "PUT"}
       end
