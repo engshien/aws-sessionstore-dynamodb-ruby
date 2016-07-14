@@ -111,7 +111,7 @@ module Aws::SessionStore::DynamoDB::Locking
       packed_session = pack_data(session)
       data = data_unchanged?(env, packed_session) ? {} : data_attr(packed_session)
       {
-        :attribute_updates => merge_all(updated_attr, data, add_attrs, user_attr(session)),
+        :attribute_updates => merge_all(updated_attr, data, add_attrs, shadow_attr(session)),
         :return_values => "UPDATED_NEW"
       }
     end
@@ -137,13 +137,18 @@ module Aws::SessionStore::DynamoDB::Locking
        { "data" => {:value => session, :action  => "PUT"} }
     end
 
-    def user_attr(session)
-      key = @config.user_key
-      if key.nil? || !session.key?(key)
-        { }
-      else
-        { key => {:value => session[key], :action  => "PUT"} }
+    def shadow_attr(session)
+      return {} if @config.shadow.nil?
+
+      attr = Hash.new
+
+      @config.shadow.split(',').each do |e|
+        key = e.split(':')[0]
+        value = session[key]
+        attr[key] = value.nil? ? {:action => "DELETE"} : {:value => value, :action => "PUT"}
       end
+
+      attr
     end
 
     # Determine if data has been manipulated

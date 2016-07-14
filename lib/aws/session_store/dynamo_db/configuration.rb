@@ -56,7 +56,8 @@ module Aws::SessionStore::DynamoDB
     DEFAULTS = {
       :table_name => "sessions",
       :table_key => "session_id",
-      :user_key => nil,
+      :shadow => nil,
+      :index => nil,
       :consistent_read => true,
       :read_capacity => 10,
       :write_capacity => 5,
@@ -77,8 +78,11 @@ module Aws::SessionStore::DynamoDB
     # @return [String] Session table hash key name.
     attr_reader :table_key
 
-    # @return [String] Name of user key in session data.
-    attr_reader :user_key
+    # @return [String] CSV of field:type to shadow
+    attr_reader :shadow
+
+    # @return [String] CSV of field to index
+    attr_reader :index
 
     # @return [true] If a strongly consistent read is used
     # @return [false] If an eventually consistent read is used.
@@ -149,7 +153,8 @@ module Aws::SessionStore::DynamoDB
     #   table.
     # @option options [String] :table_key ("id") The hash key of the sesison
     #   table.
-    # @option options [String] :user_key ("id") Name of user key in session.
+    # @option options [String] :shadow ("me") List of fields in session to shadow in main data.
+    # @option options [String] :index ("me") List of fields to create index on.
     # @option options [Boolean] :consistent_read (true) If true, a strongly
     #   consistent read is used. If false, an eventually consistent read is
     #   used.
@@ -214,6 +219,8 @@ module Aws::SessionStore::DynamoDB
       dynamo_db_client = @options[:dynamo_db_client]
       if dynamo_db_client.nil?
         client_opts = client_subset(@options)
+        # Support ENV to set endpoint to DynamoDB Local
+        client_opts[:endpoint] ||= ENV['AWS_DYNAMODB_ENDPOINT'] if ENV['AWS_DYNAMODB_ENDPOINT']
         dynamo_db_client = Aws::DynamoDB::Client.new(client_opts)
       end
 

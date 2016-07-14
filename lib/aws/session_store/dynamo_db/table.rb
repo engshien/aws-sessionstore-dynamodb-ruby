@@ -23,12 +23,10 @@ module Aws::SessionStore::DynamoDB
     # @option (see Configuration#initialize)
     def create_table(options = {})
       config = load_config(options)
-      ddb_options = properties(config.table_name, config.table_key, config.user_key).merge(
+      ddb_options = properties(config.table_name, config.table_key, config.shadow).merge(
           throughput(config.read_capacity, config.write_capacity)
         )
-      unless config.user_key.nil?
-        ddb_options.merge!(user_key_index(config.user_key))
-      end
+      ddb_options.merge!(index(config.index)) if config.index
       config.dynamo_db_client.create_table(ddb_options)
       logger << "Table #{config.table_name} created, waiting for activation...\n"
       block_until_created(config) unless options[:no_create_table_block]
@@ -58,11 +56,18 @@ module Aws::SessionStore::DynamoDB
 
     # @return [Hash] Attribute settings for creating a session table.
     # @api private
-    def attributes(hash_key, user_key)
+    def attributes(hash_key, shadow)
       attributes = [{:attribute_name => hash_key, :attribute_type => 'S'}]
-      unless user_key.nil?
-        attributes << {:attribute_name => user_key, :attribute_type => 'S'}
+
+      if shadow
+        shadow.split(',').each do |e|
+          nvp = e.split(':')
+          name = nvp[0].strip
+          type = nvp.length > 1 ? nvp[1].strip : 'S'
+          attributes << {:attribute_name => name, :attribute_type => type}
+        end
       end
+
       { :attribute_definitions => attributes }
     end
 
@@ -82,21 +87,21 @@ module Aws::SessionStore::DynamoDB
       { :provisioned_throughput => units }
     end
 
-    def user_key_index(user_key)
+    def index(fields)
       {
-        :global_secondary_indexes=> [{
-             :index_name=> "#{user_key}_index",
-             :key_schema=>[{:attribute_name => user_key, :key_type => "HASH"}],
-             :projection=> {:projection_type=>"KEYS_ONLY"},
-             :provisioned_throughput=>{:read_capacity_units=>1, :write_capacity_units=>1}
-           }]
+        :global_secondary_indexes => fields.split(',').map { |s| s.strip }.map { |f| {
+          :index_name => "#{f}_index",
+          :key_schema => [{:attribute_name => f, :key_type => "HASH"}],
+          :projection => {:projection_type => "KEYS_ONLY"},
+          :provisioned_throughput => {:read_capacity_units => 1, :write_capacity_units => 1}
+        }}
       }
     end
 
     # @return Properties for Session table
     # @api private
-    def properties(table_name, hash_key, user_key)
-      attributes(hash_key, user_key).merge(schema(table_name, hash_key))
+    def properties(table_name, hash_key, shadow)
+      attributes(hash_key, shadow).merge(schema(table_name, hash_key))
     end
 
     # @api private
