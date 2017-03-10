@@ -105,9 +105,9 @@ module Aws::SessionStore::DynamoDB
       end
     end
 
-    # Generate HMAC hash based on MD5
+    # Generate HMAC hash
     def generate_hmac(sid, secret)
-      OpenSSL::HMAC.hexdigest(OpenSSL::Digest::MD5.new, secret, sid).strip()
+      OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA256.new, secret, sid).strip()
     end
 
     # Generate sid with HMAC hash
